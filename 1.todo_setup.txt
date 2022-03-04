@@ -1,0 +1,787 @@
+npm init -y
+npm i bcrypt concurrently cookie-parser cors dotenv express jsonwebtoken mongoose colors nodemon
+
+
+npx create-react-app client
+cd client
+npm i react-router-dom axios sass
+npm start
+
+package.json 
+
+"scripts": {
+"client": "cd client && npm start",
+"server": "nodemon server.js --ignore client",
+"dev": "concurrently \"npm run server\" \"npm run client\"",
+"client-install": "cd client && npm install",
+"server-install": "npm install",
+"install-all": "concurrently \"npm run server-install\" \"npm run client-install\"",
+"heroku-postbuild": "cd client && npm install && npm run build"
+},
+
+server.js
+controllers-userCtrl.js+noteCtrl.js
+middleware -auth.js
+models -userModel.js+noteModel.js
+routers -userRouter.js+noteRouter.js
+
+server.js
+app.mvc
+const cors = require('cors')
+app.use(cors())
+app.use(express.json())
+const cookies = require("cookie-parser");
+app.use(cookies());
+app.connect
+
+.env
+POST=5000
+URI=mongodb://localhost:27017/todolist
+
+userModel.js
+!mdbgum 
+const mongoose = require('mongoose'); // Erase if already required
+
+const userSchema = new mongoose.Schema({
+    username:{
+        type:String,
+        required:true,
+        trim:true,
+    },
+    email:{
+        type:String,
+        required:true,
+        unique:true,
+    },
+    password:{
+        type:String,
+        required:true,
+    },
+});
+module.exports = mongoose.model('User', userSchema);
+
+userRouter.js 
+
+app.router
+
+
+server.js
+const userRouter = require('./routes/userRouter')
+app.use("/users", userRouter);
+
+userRouter.js
+const router = require("express").Router();
+const userCtrl = require("../controllers/userCtrl");
+
+router.post("/register", userCtrl.register);
+router.post("/login", userCtrl.login);
+router.get("/logout", userCtrl.logout);
+router.get("/refresh_token", userCtrl.refresh_token);
+module.exports = router;
+
+const Users = require("../models/userModel");
+const userCtrl = {
+  register: (req, res) => {
+    try {
+      res.json("test");
+    } catch (error) {
+      return res.status(500).json({ msg: error.message });
+    }
+  },
+  login: (req, res) => {
+    try {
+      res.json("test");
+    } catch (error) {
+      return res.status(500).json({ msg: error.message });
+    }
+  },
+  logout: (req, res) => {
+    try {
+      res.json("test");
+    } catch (error) {
+      return res.status(500).json({ msg: error.message });
+    }
+  },
+  refresh_token: (req, res) => {
+    try {
+      res.json("test");
+    } catch (error) {
+      return res.status(500).json({ msg: error.message });
+    }
+  },
+};
+module.exports = userCtrl;
+GlobalState.jsx
+api ->userApi
+component ->header+mainpage
+header->header.jsx+header.css+icon
+mainpage->Pages.jsx+utils+notes+auth
+rafce
+
+
+GlobalState.jsx
+import React, { createContext, useState } from "react";
+export const GlobalState = createContext();
+
+export const DataProvider = ({ children }) => {
+    const [token, setToken] = useState(false);
+    const state = {
+      token: [token, setToken],
+    };
+    return <GlobalState.Provider value={state}>{children}</GlobalState.Provider>;
+  };
+  
+Header.jsx
+
+import { useContext } from "react";
+import { GlobalState } from "../../GlobalState";
+const Header = () => {
+  const state = useContext(GlobalState);
+  return <div>{state}</div>;
+};
+
+export default Header;
+
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+
+  register: async (req, res) => {
+    try {
+      // res.json(req.body)
+      const { name, email, password } = req.body;
+      const user = await Users.findOne({ email });
+      if (user)
+        return res.status(400).json({ msg: "The email already exists" });
+      if (password.length < 6)
+        return res.status(400).json({ msg: "password is at the 6 char" });
+      const passwordHash = await bcrypt.hash(password, 10);
+      const newUser = await Users({ name, email, password: passwordHash });
+      //   res.json({ newUser });
+      await newUser.save();
+      const accesstoken = createAccessToken({ id: newUser._id });
+      // res.json({ accesstoken });
+      const refreshtoken = createRefreshToken({ id: newUser._id });
+      res.cookie("refreshtoken", refreshtoken, {
+        httpOnly: true,
+        path: "/user/refresh_token",
+      });
+      res.json({ refreshtoken });
+    } catch (error) {
+      return res.status(500).json({ msg: error.message });
+    }
+  },
+  refreshToken: (req, res) => {
+    try {
+      const rf_token = req.cookies.refreshtoken;
+      //   chưa đăng nhập hoặc đăng kí
+      if (!rf_token)
+        return res.status(400).json({ msg: "Please Login or Register" });
+      jwt.verify(rf_token, process.env.REFRESH, (err, user) => {
+        if (err)
+          return res.status(400).json({ msg: "Please Login or Register" });
+        const accesstoken = createAccessToken({ id: user.id });
+        res.json({ accesstoken });
+      });
+    } catch (error) {
+      return res.status(500).json({ msg: error.message });
+    }
+  },
+  login: async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const user = await Users.findOne({ email });
+      if (!user) return res.status(400).json({ msg: "User does not exists" });
+      const isWatch = await bcrypt.compare(password, user.password);
+      if (!isWatch) return res.status(400).json({ msg: "incorrect password" });
+      const accesstoken = createAccessToken({ id: user._id });
+      // res.json({ accesstoken });
+      const refreshtoken = createRefreshToken({ id: user._id });
+      res.cookie("refreshtoken", refreshtoken, {
+        httpOnly: true,
+        path: "/user/refresh_token",
+      });
+      res.json({ refreshtoken });
+    } catch (error) {
+      return res.status(500).json({ msg: error.message });
+    }
+  },
+  logout: async (req, res) => {
+    try {
+      res.clearCookie("refreshtoken", { path: "/user/refresh_token" });
+      return res.status(400).json({ msg: "Logout" });
+    } catch (error) {
+      return res.status(500).json({ msg: error.message });
+    }
+  },
+
+const createAccessToken = (user) => {
+  return jwt.sign(user, process.env.ACCESS, { expiresIn: "1d" });
+};
+const createRefreshToken = (user) => {
+  return jwt.sign(user, process.env.REFRESH, { expiresIn: "7d" });
+};
+ACCESS=7r'g>3[S=?J)ss',Z"8d4cJt.f$F=Z>?=hJT[8X3p+j+33=un+
+REFRESH=_]DzH^;};n&T(6)Tx-qM6K.hwVddme%AM](4>caNng{PEA39G:s\N-EZEHKt;_mf6$@+d}GeqC,8Yy$/r('\5PkC/D+YxGFn2E(S
+
+const jwt = require("jsonwebtoken");
+const auth = (req, res, next) => {
+  try {
+    const token = req.header("Authorization");
+    // console.log("🚀 ~ file: auth.js ~ line 5 ~ auth ~ token", token)
+    if (!token) return res.status(400).json({ msg: "Invalid Authorization" });
+    jwt.verify(token, process.env.ACCESS, (err, user) => {
+      if (err) return res.status(400).json({ msg: "Invalid Authorization" });
+      req.user = user;
+      next();
+    });
+  } catch (error) {
+    return res.status(500).json({ msg: error.message });
+  }
+};
+module.exports = auth;
+
+
+
+const mongoose = require('mongoose');
+const noteSchema = new mongoose.Schema({
+    title:{
+        type:String,
+        required:true,
+    },
+    content:{
+        type:String,
+        required:true,
+    },
+    date:{
+        type:Date,
+        default:Date.now,
+    },
+    user_id:{
+        type:String,
+        required:true,
+    },
+    name:{
+        type: String,
+        required: true
+    }
+});
+
+module.exports = mongoose.model('Notes', noteSchema);
+
+const noteRouter = require('./routers/noteRouter')
+app.use('/notes', noteRouter)
+
+
+const router = require('express').Router()
+const auth = require('../middleware/auth')
+const noteCtrl = require('../controllers/noteCtrl')
+
+router.route('/')
+    .get(auth, noteCtrl.getNotes)
+    .post(auth, noteCtrl.createNote)
+
+router.route('/:id')
+    .get(auth, noteCtrl.getNote)
+    .put(auth, noteCtrl.updateNote)
+    .delete(auth, noteCtrl.deleteNote)
+
+
+module.exports = router
+
+const Notes = require("../models/noteModel");
+const noteCtrl = {
+  getNotes: async (req, res) => {
+    try {
+    } catch (error) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+  createNote: async (req, res) => {
+    try {
+    } catch (error) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+  getNote: async (req, res) => {
+    try {
+    } catch (error) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+  updateNote: async (req, res) => {
+    try {
+    } catch (error) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+  deleteNote: async (req, res) => {
+    try {
+    } catch (error) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+};
+module.exports = noteCtrl;
+
+
+const Notes = require("../models/noteModel");
+const noteCtrl = {
+  getNotes: async (req, res) => {
+    try {
+      const notes = await Notes.find({ user_id: req.user.id });
+      res.json(notes);
+    } catch (error) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+  createNote: async (req, res) => {
+    try {
+      const { title, content, date } = req.body;
+      const newNote = new Notes({
+        title,
+        content,
+        date,
+        user_id: req.user.id,
+        name: req.user.name,
+      });
+      await newNote.save();
+      res.json({ msg: "Created a Note" });
+    } catch (error) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+  getNote: async (req, res) => {
+    try {
+      const note = await Notes.findById(req.params.id);
+      res.json(note);
+    } catch (error) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+  updateNote: async (req, res) => {
+    try {
+      const { title, content, date } = req.body;
+      await Notes.findOneAndUpdate(
+        { _id: req.params.id },
+        {
+          title,
+          content,
+          date,
+        }
+      );
+      res.json({ msg: "Updated a Note" });
+    } catch (error) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+  deleteNote: async (req, res) => {
+    try {
+        await Notes.findByIdAndDelete(req.params.id)
+        res.json({msg: "Deleted a Note"})
+    } catch (error) {
+      return res.status(500).json({ msg: err.message });
+    }
+  },
+};
+module.exports = noteCtrl;
+
+  "proxy": "http://localhost:5000/"
+
+index.js 
+import React from 'react';
+import ReactDOM from 'react-dom';
+import './index.css';
+import App from './App';
+
+ReactDOM.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+  document.getElementById('root')
+);
+
+index.css 
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  overflow-x: hidden;
+}
+.App {
+  max-width: 75%;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 0 20px;
+  box-shadow: 0 0 30px #eee;
+}
+a {
+  text-decoration: none;
+}
+ul {
+  list-style-type: none;
+}
+button {
+  border: none;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+app.js  
+
+import React from "react";
+import Header from "./components/header/Header";
+import Page from "./components/mainpage/Page";
+import {DataProvider} from "./GlobalState.jsx";
+
+const App = () => {
+  return (
+    <DataProvider>
+      <Header />
+      <Page />
+    </DataProvider>
+  );
+};
+
+export default App;
+
+UserApi.jsx
+
+import { useState, useEffect } from "react";
+const UserApi = (token) => {
+  const [isLogged, setIsLogged] = useState(false);
+  useEffect(() => {
+    if (token) {
+      const getUser = async () => {
+        try {
+          setIsLogged(true);
+        } catch (err) {
+          alert(err.response.data.msg);
+        }
+      };
+      getUser();
+    }
+  }, [token]);
+  return {
+    isLogged: [isLogged, setIsLogged],
+  };
+};
+
+export default UserApi;
+
+
+Page.jsx
+
+import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Login from "./auth/Login";
+import Register from "./auth/Register";
+import NotFound from "./utils/NotFound";
+import Notes from "./notes/Notes";
+import { useContext } from "react";
+import { GlobalState } from "../../GlobalState";
+const Page = () => {
+  const state = useContext(GlobalState);
+  console.log("🚀 ~ file: Page.jsx ~ line 11 ~ Page ~ state", state)
+  const [isLogged] = state.UserApi.isLogged;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Notes />} />
+        <Route path="/login" element={isLogged ? <NotFound /> : <Login />} />
+        <Route
+          path="/register"
+          element={isLogged ? <NotFound /> : <Register />}
+        />
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
+
+export default Page;
+
+import React from 'react'
+
+const NotFound = () => {
+    return (
+        <div>
+            NotFound
+        </div>
+    )
+}
+
+export default NotFound
+
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import axios from "axios";
+const Login = () => {
+  const [user, setUser] = useState({
+    email: "",
+    password: "",
+  });
+  const onChangeInput = (e) => {
+    const { name, value } = e.target;
+    setUser({ ...user, [name]: value });
+  };
+  const loginSubmit = async (e) => {
+    e.preventDefault(); // xoa quay tron
+    try {
+      await axios.post("/users/login", { ...user });
+      localStorage.setItem("firstLogin", true);
+      window.location.href="/"
+    } catch (error) {
+      alert(error.response.data.msg);
+    }
+  };
+  return (
+    //    .user>form>h2+input*2+.user__btn>button+Link
+    <div className="user">
+      <form onSubmit={loginSubmit}>
+        <h2>Login</h2>
+        <input
+          type="email"
+          name="email"
+          value={user.email}
+          onChange={onChangeInput}
+          placeholder='Email'
+        />
+        <input
+          type="password"
+          name="password"
+          autoComplete="on"
+          value={user.password}
+          onChange={onChangeInput}
+          placeholder='Password'
+        />
+        <div className="user__btn">
+          <button>Login</button>
+          <Link to="/register">Register</Link>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+export default Login;
+
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import axios from "axios";
+const Register = () => {
+  const [user, setUser] = useState({
+    name: "",
+    email: "",
+    password: "",
+  });
+  const onChangeInput = (e) => {
+    const { name, value } = e.target;
+    setUser({ ...user, [name]: value });
+  };
+  const registerSubmit = async (e) => {
+    e.preventDefault(); // xoa quay tron
+    try {
+      await axios.post("/users/register", { ...user });
+      localStorage.setItem("firstLogin", true);
+      window.location.href = "/";
+    } catch (error) {
+      alert(error.response.data.msg);
+    }
+  };
+  return (
+    //    .user>form>h2+input*2+.user__btn>button+Link
+    <div className="user">
+      <form onSubmit={registerSubmit}>
+        <h2>Register</h2>
+        <input
+          type="name"
+          name="name"
+          value={user.name}
+          onChange={onChangeInput}
+          placeholder="Name"
+        />
+        <input
+          type="email"
+          name="email"
+          value={user.email}
+          onChange={onChangeInput}
+          placeholder="Email"
+        />
+        <input
+          type="password"
+          name="password"
+          autoComplete="on"
+          value={user.password}
+          onChange={onChangeInput}
+          placeholder="Password"
+        />
+        <div className="user__btn">
+          <button>Register</button>
+          <Link to="/login">Login</Link>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+export default Register;
+
+.user {
+    max-width: 500px;
+    margin: 50px auto;
+    border: 3px solid rgb(3, 165, 206);
+    padding: 40px;
+    border-radius: 5px;
+    h2 {
+      text-transform: uppercase;
+      color: #555;
+    }
+    input,
+    button {
+      width: 100%;
+      height: 40px;
+      margin: 10px 0;
+      outline: 3px solid rgb(3, 165, 206);
+      border: 3px solid rgb(3, 165, 206);
+      padding: 0 5px;
+    }.user__btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-transform: uppercase;
+    }
+    button {
+      flex: 2;
+      background-color: rgb(3, 165, 206);
+      color: white;
+      text-transform: uppercase;
+    }
+    a {
+      flex: 1;
+      display:flex;
+      align-items: center;
+      justify-content: center;
+      color:orangered
+    }
+  }
+  import { useContext,useState } from "react";
+import { GlobalState } from "../../GlobalState";
+import Menu from "./icon/menu.svg";
+import Close from "./icon/close.svg";
+import { Link } from "react-router-dom";
+import axios from "axios";
+const Header = () => {
+  const state = useContext(GlobalState);
+  const [isLogged] = state.UserApi.isLogged;
+
+  const loggerRouter = () => {
+    return (
+      <>
+        <li>
+          <Link to="/" onClick={logout}>
+            Logout
+          </Link>
+        </li>
+      </>
+    );
+  };
+  const logout = async () => {
+    window.localStorage.clear();
+    window.location = "/";
+    await axios.get("/user/logout");
+  };
+  const [menu,setMenu]=useState(false);
+  const styleMenu={
+    left:menu?"0":"-100%",
+  }
+  return (
+    <header>
+      <div className="menu" onClick={() =>setMenu(!menu)}>
+        <img src={Menu} alt="" width="30" />
+      </div>
+      <div className="logo" >
+        <h1>
+          <Link to="/">Notes</Link>
+        </h1>
+      </div>
+      <ul style={styleMenu}>
+        {isLogged ? (
+          loggerRouter()
+        ) : (
+          <li>
+            <Link to="/login">Login & Register</Link>
+          </li>
+        )}
+
+        <li onClick={() =>setMenu(!menu)}>
+          <img src={Close} alt="" width="30" className="menu" />
+        </li>
+      </ul>
+    </header>
+  );
+};
+
+export default Header;
+
+header {
+  min-height: 70px;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #ccc;
+  .menu {
+    display: none;
+  }
+  .logo {
+    flex: 1;
+  }
+  a {
+    text-transform: uppercase;
+    color: #555;
+  }
+  ul {
+    display: flex;
+  }
+  li {
+    opacity: 0.7;
+    padding: 0 10px;
+  }
+  li :hover {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  header {
+    justify-content: space-between;
+    ul {
+      position: fixed;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100vh;
+      background-color: white;
+      align-items: center;
+      flex-direction: column;
+      justify-content: space-around;
+      opacity: 0.98;
+      z-index: 3;
+      transition: all ease 0.5s;
+    }
+    .menu {
+      display: block;
+      cursor: pointer;
+    }
+    .logo {
+      flex: none;
+    }
+  }
+}
